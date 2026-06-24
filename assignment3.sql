@@ -109,9 +109,30 @@ begin
 end;
 $$ language plpgsql;
 
-call add_product_to_order(1, 1, 5)
+call add_product_to_order(1, 1, 3)
 
 -- task 4 — trigger: update order total
 
-select *
-from order_items oi 
+create or replace function update_total()
+returns trigger as $$
+declare 
+	ord_id int;
+	new_total numeric;
+begin 
+	if tg_op = 'DELETE' 
+	then ord_id = old.order_id;
+	else ord_id = new.order_id;
+	end if;
+	new_total := calculate_order_total(ord_id);
+	update orders
+	set total_amount = new_total
+	where order_id = ord_id;
+	return null;
+end;
+$$ language plpgsql;
+
+create trigger update_order_total
+after insert or update or delete on order_items
+for each row
+execute function update_total();
+
