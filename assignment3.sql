@@ -112,3 +112,6 @@ $$ language plpgsql;
 call add_product_to_order(1, 1, 5)
 
 -- task 4 — trigger: update order total
+
+select *
+from order_items oi 
