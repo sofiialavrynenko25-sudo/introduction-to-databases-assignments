@@ -50,10 +50,6 @@ begin
 end;
 $$ language plpgsql;
 
-select *, calculate_order_total(1)
-from order_items
-where order_id = 1
-
 -- task 2 — procedure: create new order
 
 create or replace procedure create_order(p_customer_id int)
@@ -66,8 +62,6 @@ begin
 	values (p_customer_id, current_timestamp, 0);
 end;
 $$ language plpgsql;
-
-call create_order(1)
 
 -- task 3 — procedure: add product to order
 
@@ -109,8 +103,6 @@ begin
 end;
 $$ language plpgsql;
 
-call add_product_to_order(1, 1, 3)
-
 -- task 4 — trigger: update order total
 
 create or replace function update_total()
@@ -120,8 +112,8 @@ declare
 	new_total numeric;
 begin 
 	if tg_op = 'DELETE' 
-	then ord_id = old.order_id;
-	else ord_id = new.order_id;
+	then ord_id := old.order_id;
+	else ord_id := new.order_id;
 	end if;
 	new_total := calculate_order_total(ord_id);
 	update orders
@@ -137,5 +129,113 @@ for each row
 execute function update_total();
 
 -- task 5 — trigger: order audit log
+
+create or replace function add_log()
+returns trigger as $$
+declare 
+	ord_id int;
+	cust_id int;
+begin
+	if tg_op = 'DELETE'
+	then ord_id := old.order_id;
+		cust_id := old.customer_id;
+	else ord_id := new.order_id;
+		cust_id := new.customer_id;
+	end if;
+	insert into order_log(order_id, customer_id, "action", log_date)
+	values (ord_id, cust_id, tg_op, current_timestamp);
+	return null;
+end;
+$$ language plpgsql;
+
+create trigger order_audit_log
+after insert or update or delete on orders
+for each row
+execute function add_log();
+
+-- task 6 — testing
+
+-- customers can be created
+
+insert into customers (full_name, email, balance)
+values ('Kate Smith', 'kate.smith@gmail.com', 1000);
+
+select *
+from customers;
+
+-- products can be created
+
+insert into products (product_name, price, stock_quantity)
+values ('IPad', 1500, 5);
+
+select *
+from products;
+
+-- task 1
+
+select *, calculate_order_total(1)
+from order_items 
+where order_id = 1;
+
+-- task 2
+
+call create_order(1);
+
+-- with error
+--call create_order(5);
+
+select *
+from orders;
+
+-- task 3
+
+-- error with quantity
+--call add_product_to_order(1, 1, -5);
+
+-- error with product_id
+--call add_product_to_order(1, 6, 5);
+
+-- error with order_id
+--call add_product_to_order(5, 1, 5);
+
+-- error with not enough in stock
+--call add_product_to_order(1, 1, 100);
+
+call add_product_to_order(1, 1, 5);
+
+select *
+from order_items;
+
+-- task 4
+
+insert into order_items (order_id, product_id, quantity, price)
+values (4, 1, 2, 50);
+
+update order_items 
+set quantity = 2
+where order_item_id = 3;
+
+delete from order_items 
+where order_id = 1;
+
+select *
+from orders;
+
+-- task 5
+
+insert into orders(customer_id, order_date, total_amount)
+values (1, current_timestamp, 1000);
+
+update orders
+set total_amount = 300
+where order_id = 4;
+
+delete from orders
+where order_id = 4;
+
+select *
+from order_log;
+
+
 
 
