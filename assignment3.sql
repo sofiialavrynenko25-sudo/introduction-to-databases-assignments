@@ -136,3 +136,6 @@ after insert or update or delete on order_items
 for each row
 execute function update_total();
 
+-- task 5 — trigger: order audit log
+
+
